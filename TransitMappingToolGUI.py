@@ -4,8 +4,6 @@ import os
 import subprocess
 from subprocess import check_output
 
-#TODO add check for OS (OSX, Windows, Linux) for file directory initial path
-
 #GUI for transit mapping tool
 class TransitMappingToolGUI:
 
@@ -14,6 +12,7 @@ class TransitMappingToolGUI:
         self.master = master
         master.title("A Simple Transit Mapping Tool")
 
+        #check system OS
         if os.name == 'posix':
             self.OS = "OSX"
         elif os.name == 'nt':
@@ -21,6 +20,7 @@ class TransitMappingToolGUI:
         else:
             self.OS = "OSX"
 
+        #create object variables
         self.OSMFilePath = ""
         self.OSMLabelText = StringVar()
         self.GTFSFilePath = ""
@@ -32,6 +32,7 @@ class TransitMappingToolGUI:
         self.timePeriodEnd = 0000
         self.maxTravelTime = 0
 
+        #create UI elements (buttons, text fields etc)
         self.OSMLabel = Label(master, text="Select the map data (OSM file) for your desired service area:")
         self.OSMLabel.grid(column=0, row=0)
 
@@ -95,6 +96,8 @@ class TransitMappingToolGUI:
         self.helpButton = Button(master, text="Help", command=self.helpMe)
         self.helpButton.grid(column=0, row=15)
 
+        #end of UI elements
+
     #Method to choose the OSM filepath
     def selectOSM(self):
         if self.OS == "OSX" or self.OS == "Linux":
@@ -103,9 +106,8 @@ class TransitMappingToolGUI:
         elif self.OS == "Windows":
             self.OSMFilePath = askopenfilename(initialdir = "C:\\", title = "Select OSM File", filetypes=(("OSM Files", "*.PBF"), ("all files", "*.*")))
             
-        self.OSMLabelText.set(self.OSMFilePath)
-        self.OSMFilePathParent = os.path.dirname(self.OSMFilePath)
-        print(self.OSMFilePathParent)
+        self.OSMLabelText.set(self.OSMFilePath) #display selected file path
+        self.OSMFilePathParent = os.path.dirname(self.OSMFilePath) #set directory path for folder containing OSM and GTFS files
 
     #Method to choose the GTFS filepath
     def selectGTFS(self):
@@ -115,8 +117,7 @@ class TransitMappingToolGUI:
         elif self.OS == "Windows":
             self.GTFSFilePath = askopenfilename(initialdir = "C:\\", title = "Select GTFS File", filetypes=(("GTFS Files", "*.zip"), ("all files", "*.*")))
 
-        self.GTFSLabelText.set(self.GTFSFilePath)
-
+        self.GTFSLabelText.set(self.GTFSFilePath) #display selected file path
 
     #Method to choose OTP.jar filepath
     def selectOTP(self):
@@ -126,26 +127,31 @@ class TransitMappingToolGUI:
         elif self.OS == "Windows":
             self.OTPFilePath = askopenfilename(initialdir = "C:\\", title = "Select OpenTripPlanner jar", filetypes=(("jar Files", "*.jar"), ("all files", "*.*")))
 
-        self.OTPLabelText.set(self.OTPFilePath)
+        self.OTPLabelText.set(self.OTPFilePath) #display selected file path
 
+    #method to set the start of the desired time increment
     def setStart(self):
         self.timePeriodStart = self.timeStartEntry.get()
         print(self.timePeriodStart)
 
+    #method to set the end of the desired time increment
     def setEnd(self):
         self.timePeriodEnd = self.timeEndEntry.get()
         print(self.timePeriodEnd)
 
+    #method to set the maximum allowable travel time
     def setTravelTime(self):
         self.maxTravelTime = self.maxTravelTimeEntry.get()
         print(self.maxTravelTime)
 
+    #method to launch OpenTripPlanner based on specified file paths
+    #TODO figure out a way of printing confirmation once OTP is open
     def launchOTP(self):
-        print(check_output(['java', '-Xmx4G', '-jar', self.OTPFilePath, '--build', self.OSMFilePathParent, '--inMemory', '--analyst']))
+        subprocess.Popen(['java', '-Xmx4G', '-jar', self.OTPFilePath, '--build', self.OSMFilePathParent, '--inMemory', '--analyst'])
 
+    #method to launch a script to generate a regular point grid using QGIS
     def generateGrid(self):
         print("This will eventually generate a point grid in QGIS")
-
 
     #Method to launch help page
     def helpMe(self):
@@ -153,9 +159,7 @@ class TransitMappingToolGUI:
         #TODO add help functionality: button launches new window which displays explanation and instructions
 
 
-
-    
-
+#launch main window
 root = Tk()
 gui = TransitMappingToolGUI(root)
 root.mainloop()
