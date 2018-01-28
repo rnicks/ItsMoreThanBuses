@@ -3,6 +3,7 @@ from tkFileDialog import *
 import os
 import subprocess
 from subprocess import check_output
+import webbrowser
 
 #GUI for transit mapping tool
 class TransitMappingToolGUI:
@@ -146,8 +147,21 @@ class TransitMappingToolGUI:
 
     #method to launch OpenTripPlanner based on specified file paths
     #TODO figure out a way of printing confirmation once OTP is open
+    #TODO figure out way of saving graph to disk in folder named after router (eg halifax)
+    #maybe user configurable (textbox for 'name of router' or similar?)
     def launchOTP(self):
+        
         subprocess.Popen(['java', '-Xmx4G', '-jar', self.OTPFilePath, '--build', self.OSMFilePathParent, '--inMemory', '--analyst'])
+
+        #first create graph file on disk
+        #subprocess.call(['java', '-Xmx4g', '-jar', self.OTPFilePath, '--build', self.OSMFilePathParent])
+
+        #once graph is built, launch router
+        #subprocess.Popen(['java', '-Xmx4G', '-jar', self.OTPFilePath, '--basepath', self.OSMFilePathParent, '--router', 'halifax', '--analyst', '--server'])
+
+        #once router is running, launch webbrowser
+        #this might not be needed, but for now can be confirmation that OTP is running properly
+        #webbrowser.open('localhost:8080')
 
     #method to launch a script to generate a regular point grid using QGIS
     def generateGrid(self):
