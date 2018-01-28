@@ -1,6 +1,8 @@
 from Tkinter import *
 from tkFileDialog import *
 import os
+import subprocess
+from subprocess import check_output
 
 #TODO add check for OS (OSX, Windows, Linux) for file directory initial path
 
@@ -25,6 +27,7 @@ class TransitMappingToolGUI:
         self.GTFSLabelText = StringVar()
         self.OTPFilePath = ""
         self.OTPLabelText = StringVar()
+        self.OSMFilePathParent = ""
         self.timePeriodStart = 0000
         self.timePeriodEnd = 0000
         self.maxTravelTime = 0
@@ -101,6 +104,8 @@ class TransitMappingToolGUI:
             self.OSMFilePath = askopenfilename(initialdir = "C:\\", title = "Select OSM File", filetypes=(("OSM Files", "*.PBF"), ("all files", "*.*")))
             
         self.OSMLabelText.set(self.OSMFilePath)
+        self.OSMFilePathParent = os.path.dirname(self.OSMFilePath)
+        print(self.OSMFilePathParent)
 
     #Method to choose the GTFS filepath
     def selectGTFS(self):
@@ -136,7 +141,7 @@ class TransitMappingToolGUI:
         print(self.maxTravelTime)
 
     def launchOTP(self):
-        print("This will eventually launch OpenTripPlanner")
+        print(check_output(['java', '-Xmx4G', '-jar', self.OTPFilePath, '--build', self.OSMFilePathParent, '--inMemory', '--analyst']))
 
     def generateGrid(self):
         print("This will eventually generate a point grid in QGIS")
