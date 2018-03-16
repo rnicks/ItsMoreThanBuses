@@ -4,7 +4,7 @@ import os
 import subprocess
 from subprocess import check_output
 import webbrowser
-import urllib, json
+import urllib, json, urllib2
 import psycopg2
 import sys
 from datetime import datetime
@@ -42,6 +42,9 @@ class TransitMappingToolGUI:
 
         #this is a string containing the database credentials. for now it is hard coded, later on this will be drawn from user input
         self.connString = "host='localhost' dbname='halifaxdb' user='robertnickerson' password='velcro'"
+        self.dbname = "halifaxdb"
+        self.dbuser = "robertnickerson"
+        self.dbpassword = "velcro"
 
 
 ##########################################################################################
@@ -110,7 +113,7 @@ class TransitMappingToolGUI:
         self.timeEndButton = Button(master, text="Set", command=self.setEnd)
         self.timeEndButton.grid(column=1, row=14)
 
-        self.maxTravelTimeLabel = Label(master, text="Enter the maximum travel time in minutes:")
+        self.maxTravelTimeLabel = Label(master, text="Enter the target travel time in minutes:")
         self.maxTravelTimeLabel.grid(column=0, row=15)
 
         self.maxTravelTimeEntry = Entry()
@@ -222,7 +225,6 @@ class TransitMappingToolGUI:
 
     #method to launch a script to generate a regular point grid using postGIS
     def generateGrid(self):
-        print("This will eventually generate a point grid in postGIS")
 
         #try connecting to the database
         try:
@@ -266,10 +268,16 @@ class TransitMappingToolGUI:
         #execute function
         dbCursor.execute("""SELECT makegrid(geom, 1000, 10000) from nov27post;""")
 
+        #TODO insert the result of this function into a DB table using shp2pgsql tool
+
+
+
 
 
     #method to generate URLs based on user input data, then grab isochrones from the address and insert into database
     def generateIsochrones(self):
+
+        tempDirectory = self.OSMFilePathParent
 
         #try connecting to the database
         try:
@@ -287,29 +295,61 @@ class TransitMappingToolGUI:
         gridpoints = dbCursor.fetchall()
 
         timeIncrement = 5 #5 minute increments
+        count = 0
+        failCount = 0
+        successCount = 0
+        escapeFlag = False
+
+        response = urllib2.urlopen("http://localhost:8080/otp/routers/default/isochrone?&fromPlace=44.700295314167597,-63.705584302525502&date=2018/01/01&time=07:35:00&mode=WALK,TRANSIT&cutoffSec=2700")
+        isochrone = json.load(response)
+
+
+        #TODO look into optimizing string concatenation for generating the URLs: it's inefficient in Java, is Python the same?
 
         #outer loop: for each point in gridpoints
         for point in gridpoints:
             #get x and y coords from each gridpoint
             #NOTE: in URL, order is (y,x) rather than (x,y), per Ben's example URL
-            x = point[0]
-            y = point[1]
+            #truncate to 8 decimal places
+            x = '%.5f'%(point[0])
+            y = '%.5f'%(point[1])
 
+
+            
+            #reset cursor to the beginning of the desired time increment
             timeCursor = self.startTime
             
             #inner loop: for each 5 minute increment in time period:
             while timeCursor <= self.endTime:
                 url = "http://localhost:8080/otp/routers/default/isochrone?&fromPlace=" + str(y) +"," + str(x) +"&date=" + str(self.startDate) + "&time="+ str(timeCursor.time()) + "&mode=WALK,TRANSIT&cutoffSec=" + str(self.maxTravelTime)
-                print(url)
-                timeCursor += timedelta(minutes = timeIncrement)
-
-                #currently the URLs being generated are not recognized by OTP, working on figuring out why. The formatting appears correct based on Ben's example URL
-                #As a result, we can't get the JSON data yet
+                #print(str(count) + "-----" + url)
+                count += 1
                 
-                #request json data from URL
-                #reponse = urllib.urlopen(url)
-                #parse response
-                #isochrone = json.loads(response.read())
+                #request data from URL
+
+                try:
+                    response = urllib2.urlopen(url)
+                    
+                except urllib2.HTTPError as err:
+                    #failCount += 1
+                    #print("Failed: "+ str(failCount) + url)
+                    timeCursor += timedelta(minutes = timeIncrement)
+                    continue
+
+                #parse the response as json
+                isochrone = json.load(response)
+
+                #write json to a tempfile, hopefully we can eliminate this step
+                with open(tempDirectory + "tempiso.json", "w") as f:
+                    json.dump(isochrone, f)
+
+                #TODO figure out how to determine whether to overwrite or append new isochrones to the db table
+                    
+                #insert temp json file into db
+                subprocess.Popen(["ogr2ogr", "-f", "PostgreSQL", "PG:dbname="+ self.dbname + " user=" + self.dbuser + " password=" +self.dbpassword, "-nln", "testiso", "-append", tempDirectory+ "tempiso.json"])
+
+                #increment cursor by time increment (5 mins)
+                timeCursor += timedelta(minutes = timeIncrement)
 
                 #TODO load isochrone into appropriate database table
 
