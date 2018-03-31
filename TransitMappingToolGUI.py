@@ -9,6 +9,9 @@ import psycopg2
 import sys
 from datetime import datetime
 from datetime import timedelta
+from pathos import pools
+from pathos.helpers import freeze_support
+
 
 #GUI for transit mapping tool
 class TransitMappingToolGUI:
@@ -41,8 +44,8 @@ class TransitMappingToolGUI:
         self.maxTravelTime = 0   #this is provided by user in minutes, but converted to seconds
 
         #this is a string containing the database credentials. for now it is hard coded, later on this will be drawn from user input
-        self.connString = "host='localhost' dbname='halifaxdb' user='robertnickerson' password='velcro'"
-        self.dbname = "halifaxdb"
+        self.connString = "host='localhost' dbname='test' user='robertnickerson' password='velcro'"
+        self.dbname = "test"
         self.dbuser = "robertnickerson"
         self.dbpassword = "velcro"
 
@@ -243,6 +246,13 @@ class TransitMappingToolGUI:
         #create a cursor, which is used to query the DB
         dbCursor = conn.cursor()
 
+        #####
+        
+        #Select map extent as geom from OSM file (after importing OSM to postGIS)
+        
+
+        #####
+
         #create function
         dbCursor.execute("""
         CREATE OR REPLACE FUNCTION makegrid(geometry, integer, integer)
@@ -266,12 +276,13 @@ class TransitMappingToolGUI:
         #SELECT statement to access function uses nov27post as input table and the geom column as polygon, third integer is scale
  
         #execute function
-        dbCursor.execute("""SELECT makegrid(geom, 1000, 10000) from nov27post;""")
-
+        dbCursor.execute("""
+            
+        SELECT makegrid (bextent, 1000, 10000) into gridpointtest FROM
+            (SELECT ST_SetSRID(ST_Extent(way),4326) as bextent FROM planet_osm_polygon) as grid
+;""")
+        conn.commit()
         #TODO insert the result of this function into a DB table using shp2pgsql tool
-
-
-
 
 
     #method to generate URLs based on user input data, then grab isochrones from the address and insert into database
@@ -289,7 +300,7 @@ class TransitMappingToolGUI:
         dbCursor = conn.cursor()
 
         #select all rows from table gridpoints in DB
-        dbCursor.execute("""SELECT x, y from gridpoints""")
+        dbCursor.execute("""SELECT ST_X(geom), ST_Y(geom) from gridpoints""")
 
         #create a list to store the returned rows. Each row contains info on one gridpoint
         gridpoints = dbCursor.fetchall()
@@ -299,9 +310,6 @@ class TransitMappingToolGUI:
         failCount = 0
         successCount = 0
         escapeFlag = False
-
-        response = urllib2.urlopen("http://localhost:8080/otp/routers/default/isochrone?&fromPlace=44.700295314167597,-63.705584302525502&date=2018/01/01&time=07:35:00&mode=WALK,TRANSIT&cutoffSec=2700")
-        isochrone = json.load(response)
 
 
         #TODO look into optimizing string concatenation for generating the URLs: it's inefficient in Java, is Python the same?
@@ -314,15 +322,13 @@ class TransitMappingToolGUI:
             x = '%.5f'%(point[0])
             y = '%.5f'%(point[1])
 
-
-            
             #reset cursor to the beginning of the desired time increment
             timeCursor = self.startTime
             
             #inner loop: for each 5 minute increment in time period:
             while timeCursor <= self.endTime:
                 url = "http://localhost:8080/otp/routers/default/isochrone?&fromPlace=" + str(y) +"," + str(x) +"&date=" + str(self.startDate) + "&time="+ str(timeCursor.time()) + "&mode=WALK,TRANSIT&cutoffSec=" + str(self.maxTravelTime)
-                #print(str(count) + "-----" + url)
+                print(str(count) + "-----" + url)
                 count += 1
                 
                 #request data from URL
@@ -335,6 +341,12 @@ class TransitMappingToolGUI:
                     #print("Failed: "+ str(failCount) + url)
                     timeCursor += timedelta(minutes = timeIncrement)
                     continue
+                except:
+                    #failCount += 1
+                    #print("Failed: "+ str(failCount) + url)
+                    timeCursor += timedelta(minutes = timeIncrement)
+                    continue
+
 
                 #parse the response as json
                 isochrone = json.load(response)
@@ -342,11 +354,10 @@ class TransitMappingToolGUI:
                 #write json to a tempfile, hopefully we can eliminate this step
                 with open(tempDirectory + "tempiso.json", "w") as f:
                     json.dump(isochrone, f)
-
-                #TODO figure out how to determine whether to overwrite or append new isochrones to the db table
                     
                 #insert temp json file into db
-                subprocess.Popen(["ogr2ogr", "-f", "PostgreSQL", "PG:dbname="+ self.dbname + " user=" + self.dbuser + " password=" +self.dbpassword, "-nln", "testiso", "-append", tempDirectory+ "tempiso.json"])
+                #decide whether to append or not: add "-append", to the subprocess command if so
+                subprocess.Popen(["ogr2ogr", "-f", "PostgreSQL", "PG:dbname="+ self.dbname + " user=" + self.dbuser + " password=" +self.dbpassword, "-nln","testiso", "-append", tempDirectory+ "tempiso.json"])
 
                 #increment cursor by time increment (5 mins)
                 timeCursor += timedelta(minutes = timeIncrement)
