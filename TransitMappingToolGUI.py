@@ -11,6 +11,7 @@ from datetime import datetime
 from datetime import timedelta
 from pathos import pools
 from pathos.helpers import freeze_support
+from threading import Lock
 
 
 #GUI for transit mapping tool
@@ -310,12 +311,22 @@ class TransitMappingToolGUI:
         failCount = 0
         successCount = 0
         escapeFlag = False
+        dbname = self.dbname
+        dbuser = self.dbuser
+        dbpassword = self.dbpassword
+        startDate = self.startDate
+        maxTravelTime = self.maxTravelTime
+        endTime = self.endTime
 
-
+        self.lock = Lock()
+        lock = self.lock
         #TODO look into optimizing string concatenation for generating the URLs: it's inefficient in Java, is Python the same?
 
         #outer loop: for each point in gridpoints
-        def proc(point):
+        def proc(point, startTime):
+            print("in proc")
+            
+
             #get x and y coords from each gridpoint
             #NOTE: in URL, order is (y,x) rather than (x,y), per Ben's example URL
             #truncate to 8 decimal places
@@ -323,11 +334,17 @@ class TransitMappingToolGUI:
             y = '%.5f'%(point[1])
 
             #reset cursor to the beginning of the desired time increment
-            timeCursor = self.startTime
+            timeCursor = startTime
+            print (timeCursor)
+            print (endTime)
+            print (timeCursor <=endTime)
+
+           
             
             #inner loop: for each 5 minute increment in time period:
-            while timeCursor <= self.endTime:
-                url = "http://localhost:8080/otp/routers/default/isochrone?&fromPlace=" + str(y) +"," + str(x) +"&date=" + str(self.startDate) + "&time="+ str(timeCursor.time()) + "&mode=WALK,TRANSIT&cutoffSec=" + str(self.maxTravelTime)
+            while timeCursor <= endTime:
+                print("test")
+                url = "http://localhost:8080/otp/routers/default/isochrone?&fromPlace=" + str(y) +"," + str(x) +"&date=" + str(startDate) + "&time="+ str(timeCursor.time()) + "&mode=WALK,TRANSIT&cutoffSec=" + str(maxTravelTime)
                 print(str(count) + "-----" + url)
                 count += 1
                 
@@ -350,24 +367,28 @@ class TransitMappingToolGUI:
 
                 #parse the response as json
                 isochrone = json.load(response)
-
+                lock.acquire()
                 #write json to a tempfile, hopefully we can eliminate this step
-                with open(tempDirectory + "tempiso.json", "w") as f:
-                    json.dump(isochrone, f)
-                    
+                try:
+                    with open(tempDirectory + "tempiso.json", "w") as f:
+                        json.dump(isochrone, f)
+                finally:
+                    lock.release()
                 #insert temp json file into db
                 #decide whether to append or not: add "-append", to the subprocess command if so
-                subprocess.Popen(["ogr2ogr", "-f", "PostgreSQL", "PG:dbname="+ self.dbname + " user=" + self.dbuser + " password=" +self.dbpassword, "-nln","testiso", "-append", tempDirectory+ "tempiso.json"])
+                subprocess.Popen(["ogr2ogr", "-f", "PostgreSQL", "PG:dbname="+ dbname + " user=" + dbuser + " password=" +dbpassword, "-nln","testiso", "-append", tempDirectory+ "tempiso.json"])
 
                 #increment cursor by time increment (5 mins)
                 timeCursor += timedelta(minutes = timeIncrement)
 
                 #TODO load isochrone into appropriate database table
-                
+
+        print("before proc")
+               
         p = pools.ThreadPool()
         # print p.map(lambda i: i, range(10))
         test = [1, 2, 3, 4]
-        p.amap(lambda point: self.proc(point), gridpoints)
+        p.amap(lambda point: proc(point, self.startTime), gridpoints)
         # print "after Proc"
         p.close()
         p.join()
