@@ -137,12 +137,15 @@ class TransitMappingConfigurePageGUI:
             #Pop up error message
             tkMessageBox.showwarning("Error", "You must enter a database username, password, and database name")
             return
-        
-        
-     
 
-        #shp2pgsql -I -s 4326 districts.shp districts | psql -d postgres -U postgres 
+        connString = "host='localhost' dbname='" + self.dbName + "' user='" + self.dbUsername + "' password='" + self.dbPassword + "'"
 
+        dbConnection = psycopg2.connect(connString)
+        dbCursor =  dbConnection.cursor()
+
+        dbCursor.execute("DROP TABLE IF EXISTS gridpoints")
+        dbConnection.commit()
+        
         p1 = subprocess.Popen(['shp2pgsql', '-I', '-s', '4326', self.gridFilePath, 'gridpoints'], stdout=subprocess.PIPE)
         p2 = subprocess.Popen(['psql', '-d', self.dbName, '-U', self.dbUsername], stdin=p1.stdout)
         print p2.communicate()
@@ -161,19 +164,7 @@ class TransitMappingConfigurePageGUI:
         tables = (
             """CREATE EXTENSION postgis""",
             
-            """ CREATE TABLE GridPoints(
-            g_id INTEGER PRIMARY KEY,
-
-            geom FLOAT(8),
-
-            x FLOAT(8),
-
-            y FLOAT(8),
-
-            loc_id INTEGER)""",
-
-
-
+     
             """ CREATE TABLE GridLocation(
 
             loc_id INTEGER PRIMARY KEY,
@@ -223,7 +214,6 @@ class TransitMappingConfigurePageGUI:
             flag_Post INTEGER,
 
             FOREIGN KEY (analysis_id) REFERENCES Analysis(analysis_id))""",
-
 
 
             """ CREATE TABLE IsoTables(
