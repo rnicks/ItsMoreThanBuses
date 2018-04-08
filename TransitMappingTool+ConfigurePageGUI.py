@@ -80,6 +80,7 @@ class TransitMappingConfigurePageGUI:
 
         self.analysisTypeVar.set("single")
 
+     
         
         self.setupDBLabel = Label(master, text="Select the level of precision for latitude/longitude coordinates:")
         self.setupDBLabel.grid(column=0, row=8)
@@ -143,8 +144,6 @@ class TransitMappingConfigurePageGUI:
         dbPassword = self.dbPasswordEntry.get()
         dbName = self.dbNameEntry.get()
         analysisType = self.analysisTypeVar.get()
-        #routerName = self.routerNameEntry.get()
-        #gridSize = self.gridSizeEntry.get()
         precisionPoints = self.precisionPointsVar.get()
 
         if dbUsername == "" or dbPassword == "" or dbName == "":
@@ -158,10 +157,11 @@ class TransitMappingConfigurePageGUI:
         dbConnection = psycopg2.connect(connString)
         dbCursor =  dbConnection.cursor()
 
-        dbCursor.execute("DROP TABLE IF EXISTS gridpoints")
+        #clear gridpoints table
+        dbCursor.execute("TRUNCATE gridpoints RESTART IDENTITY CASCADE")
         dbConnection.commit()
         
-        p1 = subprocess.Popen(['shp2pgsql', '-I', '-s', '4326', gridFilePath, 'gridpoints'], stdout=subprocess.PIPE)
+        p1 = subprocess.Popen(['shp2pgsql', '-a', '-I', '-s','4326', gridFilePath, 'gridpoints'], stdout=subprocess.PIPE)
         p2 = subprocess.Popen(['psql', '-d', dbName, '-U', dbUsername], stdin=p1.stdout)
         print p2.communicate()
         
@@ -182,22 +182,24 @@ class TransitMappingConfigurePageGUI:
             return
 
         tables = (
-            """CREATE EXTENSION postgis""",
+            """CREATE EXTENSION IF NOT EXISTS postgis""",
+
+            """ CREATE TABLE IF NOT EXISTS gridpoints(
+
+            gid SERIAL PRIMARY KEY,
+
+            id SERIAL,
+
+            geom geometry,
+
+            preAnalysis INTEGER DEFAULT 0,
+
+            postAnalysis INTEGER DEFAULT 0,
+
+            diff INTEGER DEFAULT 0)""",
             
-            """ CREATE TABLE GridPoints(
-            g_id INTEGER PRIMARY KEY,
 
-            geom FLOAT(8),
-
-            x FLOAT(8),
-
-            y FLOAT(8),
-
-            loc_id INTEGER)""",
-
-
-
-            """ CREATE TABLE GridLocation(
+            """ CREATE TABLE IF NOT EXISTS GridLocation(
 
             loc_id INTEGER PRIMARY KEY,
 
@@ -205,7 +207,7 @@ class TransitMappingConfigurePageGUI:
 
 
 
-            """ CREATE TABLE Analysis(
+            """ CREATE TABLE IF NOT EXISTS Analysis(
 
             analysis_id INTEGER PRIMARY KEY,
 
@@ -219,9 +221,9 @@ class TransitMappingConfigurePageGUI:
 
 
 
-            """ CREATE TABLE AnalysisResults(
+            """ CREATE TABLE IF NOT EXISTS AnalysisResults(
 
-            g_id INTEGER,
+            gid INTEGER,
 
             analysis_id INTEGER,
 
@@ -231,13 +233,17 @@ class TransitMappingConfigurePageGUI:
 
             overlap_count INTEGER,
 
-            FOREIGN KEY (g_id) REFERENCES GridPoints(g_id))""",
+            FOREIGN KEY (gid) REFERENCES gridpoints(gid))""",
 
 
 
-            """ CREATE TABLE IsoChrones(
+            """ CREATE TABLE IF NOT EXISTS IsoChrones(
 
-            Iso_ID INTEGER,
+             ogc_fid SERIAL,
+
+             wkb_geometry geometry,
+
+             time int,
 
             analysis_id INTEGER,
 
@@ -245,12 +251,7 @@ class TransitMappingConfigurePageGUI:
 
             flag_Post INTEGER,
 
-            FOREIGN KEY (analysis_id) REFERENCES Analysis(analysis_id))""",
-
-
-            """ CREATE TABLE IsoTables(
-            )                
-            """)
+            FOREIGN KEY (analysis_id) REFERENCES Analysis(analysis_id))""",)
 
 
         connString = "host='localhost' dbname='" + dbName + "' user='" + dbUsername + "' password='" + dbPassword + "'"
@@ -328,64 +329,65 @@ class TransitMappingToolGUI():
         #GTFS compare 
         if analysisType == "pre-post":
             self.GTFSLabelCompare = Label(master, text="Select the GTFS data for your transit system that you want to compare:")
-            self.GTFSLabelCompare.grid(column=0, row=3)
+            self.GTFSLabelCompare.grid(column=0, row=4)
             
             self.GTFSLabelPathCompare = Label(master, textvariable=self.GTFSLabelTextCompare, fg="blue")
-            self.GTFSLabelPathCompare.grid(column=0, row=4)
+            self.GTFSLabelPathCompare.grid(column=0, row=5)
         
             self.GTFSButtonCompare = Button(master, text="Select GTFS", command=self.selectGTFSCompare)
-            self.GTFSButtonCompare.grid(column=1, row=3)        
+            self.GTFSButtonCompare.grid(column=1, row=4)        
 
         self.OTPLabel = Label(master, text="Select your OpenTripPlanner .jar file:")
-        self.OTPLabel.grid(column=0, row=6)
+        self.OTPLabel.grid(column=0, row=7)
 
         self.OTPLabelPath = Label(master, textvariable=self.OTPLabelText, fg="blue")
-        self.OTPLabelPath.grid(column=0, row=7)
+        self.OTPLabelPath.grid(column=0, row=8)
 
         self.OTPButton = Button(master, text="Select jar file", command=self.selectOTP)
-        self.OTPButton.grid(column=1, row=6)
+        self.OTPButton.grid(column=1, row=7)
 
         self.startDateLabel = Label(master, text="Enter the start date for your analysis (YYYY/MM/DD)")
-        self.startDateLabel.grid(column=0, row=8)
+        self.startDateLabel.grid(column=0, row=9)
 
         self.startDateEntry = Entry(master)
-        self.startDateEntry.grid(column=0, row=9)
+        self.startDateEntry.grid(column=0, row=10)
 
         self.endDateLabel = Label(master, text="Enter the end date for your analysis (YYYY/MM/DD)")
-        self.endDateLabel.grid(column=0, row=10)
+        self.endDateLabel.grid(column=0, row=11)
 
         self.endDateEntry = Entry(master)
-        self.endDateEntry.grid(column=0, row=11)
+        self.endDateEntry.grid(column=0, row=12)
 
         self.timeStartLabel = Label(master, text="Enter the start time for your time increment (hh:mm:ss)")
-        self.timeStartLabel.grid(column=0, row=12)
+        self.timeStartLabel.grid(column=0, row=13)
 
         self.timeStartEntry = Entry(master)
-        self.timeStartEntry.grid(column=0, row=13)
+        self.timeStartEntry.grid(column=0, row=14)
 
 
         self.timeEndLabel = Label(master, text="Enter the end time for your time increment (hh:mm:ss)")
-        self.timeEndLabel.grid(column=0, row=14)
+        self.timeEndLabel.grid(column=0, row=15)
 
         self.timeEndEntry = Entry(master)
-        self.timeEndEntry.grid(column=0, row=15)
+        self.timeEndEntry.grid(column=0, row=16)
 
 
         self.maxTravelTimeLabel = Label(master, text="Enter the target travel time in minutes:")
-        self.maxTravelTimeLabel.grid(column=0, row=16)
+        self.maxTravelTimeLabel.grid(column=0, row=17)
 
         self.maxTravelTimeEntry = Entry(master)
-        self.maxTravelTimeEntry.grid(column=0, row=17)
+        self.maxTravelTimeEntry.grid(column=0, row=18)
 
 
         self.launchOTPButton = Button(master, text="Launch OpenTripPlanner", command=self.launchOTP)
-        self.launchOTPButton.grid(column=0, row=18)
+        self.launchOTPButton.grid(column=0, row=19)
+
 
         self.generateGridButton = Button(master, text="Generate Isochrones", command=self.generateIsochrones)
-        self.generateGridButton.grid(column=0, row=19)
+        self.generateGridButton.grid(column=0, row=20)
 
-        self.helpButton = Button(master, text="Help", command=self.helpMe)
-        self.helpButton.grid(column=1, row=19)
+        self.helpButton = Button(master, text="Calculate Overlap", command=self.calculatePreOverlap)
+        self.helpButton.grid(column=1, row=20)
 
         #end of UI elements
 
@@ -488,6 +490,11 @@ class TransitMappingToolGUI():
         #once graph is built, launch router
         #subprocess.Popen(['java', '-Xmx4G', '-jar', self.OTPFilePath, '--basepath', self.OSMFilePathParent, '--router', 'halifax', '--analyst', '--server'])
 
+        #once router is running, launch OTP in browser
+        #this won't be needed, but for now can be confirmation that OTP is running properly
+        #webbrowser.open('localhost:8080')
+
+    
 
     #method to generate URLs based on user input data, then grab isochrones from the address and insert into database
     def generateIsochrones(self):
@@ -532,7 +539,6 @@ class TransitMappingToolGUI():
             y = ""
 
             if precisionPoints == "3":
-              print ("if statement tripped")
               x = '%.3f'%(point[0])
               y = '%.3f'%(point[1])
 
@@ -544,8 +550,6 @@ class TransitMappingToolGUI():
               x = '%.5f'%(point[0])
               y = '%.5f'%(point[1])
 
-            print("x: " + str(x))
-            print("y: " + str(y))
             #reset cursor to the beginning of the desired time increment
             timeCursor = self.startTime
             
@@ -586,7 +590,37 @@ class TransitMappingToolGUI():
                 #increment cursor by time increment (5 mins)
                 timeCursor += timedelta(minutes = timeIncrement)
 
-                #TODO load isochrone into appropriate database table
+    #calculate the overlap values for the first version of the network
+    #store overlap values in the gridpoints table
+    #only does the first 1000 as a proof of concept
+    def calculatePreOverlap(self):
+
+        # Connect to the database
+
+        connString = "host='localhost' dbname='" + dbName + "' user='" + dbUsername + "' password='" + dbPassword + "'"
+
+        try:
+            dbConnection = psycopg2.connect(self.connString)
+        except:
+            print("Database connection error")
+
+        # Make the cursor
+
+        dbCursor = dbConnection.cursor()
+
+        dbCursor.execute("""UPDATE gridpoints SET preanalysis = preanalysis + total
+                       FROM (SELECT gridpoints.gid, count(gridpoints.geom) AS total
+                       FROM testiso LEFT JOIN gridpoints
+                       ON ST_Intersects(testiso.wkb_geometry, gridpoints.geom)
+                       GROUP BY gridpoints.gid)
+                       AS a WHERE gridpoints.gid = a.gid""")
+        dbConnection.commit()
+
+        print("running overlap analysis")
+
+
+    
+
 
     #Method to launch help page
     def helpMe(self):
@@ -598,4 +632,5 @@ class TransitMappingToolGUI():
 root = Tk()
 gui = TransitMappingConfigurePageGUI(root)
 root.mainloop()
+
 
