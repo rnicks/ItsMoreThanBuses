@@ -155,13 +155,13 @@ class TransitMappingConfigurePageGUI:
         dbCursor.execute("TRUNCATE gridpoints RESTART IDENTITY CASCADE")
         dbConnection.commit()
 
-        #initialize pre, post, and diff columns
-        dbCursor.execute("UPDATE gridpoints SET preanalysis = 0, postanalysis = 0, diff = 0")
-        dbConnection.commit()
-        
         p1 = subprocess.Popen(['shp2pgsql', '-a', '-I', '-s','4326', gridFilePath, 'gridpoints'], stdout=subprocess.PIPE)
         p2 = subprocess.Popen(['psql', '-d', dbName, '-U', dbUsername], stdin=p1.stdout)
         print p2.communicate()
+
+         #initialize pre, post, and diff columns
+        dbCursor.execute("UPDATE gridpoints SET preanalysis = 0, postanalysis = 0, diff = 0")
+        dbConnection.commit()
         
         self.newWindow = Toplevel(root)
         self.app = TransitMappingToolGUI(self.newWindow)
@@ -608,6 +608,10 @@ class TransitMappingToolGUI():
 
     #calculate the isochrone overlap values for pre analysis, post analysis, and the difference between the two
     def calculateOverlap(self):
+
+    
+   
+        
         self.calculatePreOverlap()
         self.calculatePostOverlap()
         self.calculateOverlapDiff()
@@ -705,5 +709,4 @@ class TransitMappingToolGUI():
 root = Tk()
 gui = TransitMappingConfigurePageGUI(root)
 root.mainloop()
-
 
