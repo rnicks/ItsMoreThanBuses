@@ -1,3 +1,12 @@
+DEFICIENCIES:
+Currently no support for running multiple OTP routers at once, so pre/post analysis is limited to using a single router with different dates rather than comparing two different transit network configurations
+
+Currently no support for storing old analyses - currently only a single pair (pre/post analysis) can be effectively handled at a time.
+
+Currently no support for automatically generating a point grid - this must first be done manually in QGIS
+
+
+
 It’s More Than Buses
 OSX Installation Instructions
 
