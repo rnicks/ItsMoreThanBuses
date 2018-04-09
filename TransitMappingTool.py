@@ -447,11 +447,12 @@ class TransitMappingToolGUI():
 
     #method to set the start of the desired time increment in datetime format
     def setStart(self):
-       try:
+        try:
             self.startTime = self.timeStartEntry.get()
             #convert input to a datetime object
             self.startTime = datetime.strptime(self.startTime, '%H:%M:%S')
             print(self.startTime.time())
+            
         except ValueError:
             print "You need to enter valid time data in the start time field" 
 
@@ -694,8 +695,6 @@ class TransitMappingToolGUI():
 
 
     
-
-
     #Method to launch help page
     def helpMe(self):
         print("open help file")#throw in subprocess to open readme.txt
